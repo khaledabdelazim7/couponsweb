@@ -1,0 +1,82 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+// ──────────────────────────────────────────────
+// Legacy models (kept for historical data)
+// ──────────────────────────────────────────────
+
+model User {
+  id                Int      @id @default(autoincrement())
+  phone             String   @unique
+  dailyCouponsCount Int      @default(0)
+  lastCouponDate    DateTime?
+}
+
+model Coupon {
+  id    Int      @id @default(autoincrement())
+  phone String
+  value Int
+  date  DateTime @default(now())
+}
+
+// ──────────────────────────────────────────────
+// System Settings
+// ──────────────────────────────────────────────
+
+model Setting {
+  id                  Int     @id @default(autoincrement())
+  timerDuration       Int     @default(60)
+  maxCouponValue      Int     @default(200)
+  dailyLimit          Int     @default(2)
+  couponSystemEnabled Boolean @default(true)
+  winnersPerDay       Int     @default(5)
+  couponValue         Int     @default(50)
+}
+
+// ──────────────────────────────────────────────
+// Draw System (new)
+// ──────────────────────────────────────────────
+
+model DrawRound {
+  id             Int         @id @default(autoincrement())
+  isActive       Boolean     @default(true)
+  cycleStartDate DateTime    @default(now())
+  cycleEndDate   DateTime?
+  createdAt      DateTime    @default(now())
+  entries        DrawEntry[]
+}
+
+model DrawEntry {
+  id          Int       @id @default(autoincrement())
+  phone       String
+  roundId     Int
+  status      String    @default("WAITING") // WAITING, COMPLETED, FORFEITED
+  isWinner    Boolean   @default(false)
+  couponCode  String?
+  couponValue Int?
+  startedAt   DateTime  @default(now())
+  lastHeartbeat DateTime @default(now())
+  drawnAt     DateTime?
+  createdAt   DateTime  @default(now())
+  round     DrawRound @relation(fields: [roundId], references: [id])
+
+  @@unique([phone, roundId])
+}
+
+// ──────────────────────────────────────────────
+// Advertisement (new)
+// ──────────────────────────────────────────────
+
+model Advertisement {
+  id        Int      @id @default(autoincrement())
+  imageUrl  String
+  caption   String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
