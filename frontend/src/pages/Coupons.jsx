@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import DynamicAdsRenderer from '../components/DynamicAdsRenderer';
 
 const API_URL = 'https://couponsweb-production.up.railway.app/api';
 // ── Confetti Component ──────────────────────────
@@ -222,6 +223,8 @@ const Coupons = () => {
 
   return (
     <div className="coupons-page">
+
+      <DynamicAdsRenderer placement="Coupons Page" />
 
       {/* Advertisement Banner */}
       <AdBanner ads={ads} />

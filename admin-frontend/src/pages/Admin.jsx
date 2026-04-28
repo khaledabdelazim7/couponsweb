@@ -16,6 +16,8 @@ const Admin = () => {
   const [entries, setEntries] = useState([]);
   const [ads, setAds] = useState([]);
   const [historyRounds, setHistoryRounds] = useState([]);
+  const [dynamicAds, setDynamicAds] = useState([]);
+  const [dynamicAdForm, setDynamicAdForm] = useState({ title: '', htmlCode: '', targetLink: '', placement: 'Both', isActive: true, startDate: '', endDate: '' });
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
   const [adImage, setAdImage] = useState(null);
@@ -42,21 +44,24 @@ const Admin = () => {
   const fetchData = async () => {
     try {
       const headers = getHeaders();
-      const [settingsRes, drawRes, adRes, historyRes] = await Promise.all([
+      const [settingsRes, drawRes, adRes, historyRes, dynamicAdsRes] = await Promise.all([
         fetch(`${API_URL}/settings`, { headers }),
         fetch(`${API_URL}/draw`, { headers }),
         fetch(`${API_URL}/advertisement`, { headers }),
         fetch(`${API_URL}/history`, { headers }),
+        fetch(`${API_URL}/dynamic-ads`, { headers })
       ]);
       const s = await settingsRes.json();
       const d = await drawRes.json();
       const a = await adRes.json();
       const h = await historyRes.json();
+      const da = await dynamicAdsRes.json();
 
       if (s) setSettings(s);
       if (d) { setRound(d.round); setEntries(d.entries || []); }
       if (Array.isArray(a)) setAds(a);
       if (Array.isArray(h)) setHistoryRounds(h);
+      if (Array.isArray(da)) setDynamicAds(da);
     } catch (err) {
       console.error('Error fetching admin data', err);
     } finally {
@@ -137,6 +142,58 @@ const Admin = () => {
       showToast('تم حذف الإعلان ✅');
     } catch {
       showToast('حدث خطأ أثناء حذف الإعلان', 'error');
+    }
+  };
+
+  const handleDynamicAdFormChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setDynamicAdForm(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
+  };
+
+  const createDynamicAd = async () => {
+    try {
+      const res = await fetch(`${API_URL}/dynamic-ads`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...getHeaders() },
+        body: JSON.stringify(dynamicAdForm)
+      });
+      const data = await res.json();
+      if (data.error) showToast(data.error, 'error');
+      else {
+        showToast('تم إضافة الإعلان بنجاح ✅');
+        setDynamicAds(prev => [data.ad, ...prev]);
+        setDynamicAdForm({ title: '', htmlCode: '', targetLink: '', placement: 'Both', isActive: true, startDate: '', endDate: '' });
+      }
+    } catch {
+      showToast('حدث خطأ أثناء إضافة الإعلان', 'error');
+    }
+  };
+
+  const toggleDynamicAdStatus = async (ad) => {
+    try {
+      const res = await fetch(`${API_URL}/dynamic-ads/${ad.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', ...getHeaders() },
+        body: JSON.stringify({ ...ad, isActive: !ad.isActive })
+      });
+      const data = await res.json();
+      if (!data.error) {
+         setDynamicAds(prev => prev.map(a => a.id === ad.id ? data.ad : a));
+         showToast('تم تغيير حالة الإعلان ✅');
+      }
+    } catch {
+      showToast('حدث خطأ', 'error');
+    }
+  };
+
+  const removeDynamicAd = async (adId) => {
+    if (!window.confirm('هل تريد حذف هذا الإعلان الديناميكي؟')) return;
+    try {
+      await fetch(`${API_URL}/dynamic-ads/${adId}`, { method: 'DELETE', headers: getHeaders() });
+      setDynamicAds(prev => prev.filter(a => a.id !== adId));
+      showToast('تم حذف الإعلان ✅');
+    } catch {
+      showToast('حدث خطأ', 'error');
     }
   };
 
@@ -343,6 +400,81 @@ const Admin = () => {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      </div>
+
+      {/* ── SECTION 3.5: Dynamic Ads Manager ── */}
+      <div className="admin-full-card" style={{ marginTop: '30px' }}>
+        <h3>🚀 إدارة الإعلانات الديناميكية (أكواد وروابط)</h3>
+        <div className="ad-manager-grid">
+          {/* Create Form */}
+          <div className="ad-upload-section">
+            <div className="admin-form-group">
+              <label>العنوان (اختياري)</label>
+              <input type="text" name="title" className="admin-input" value={dynamicAdForm.title} onChange={handleDynamicAdFormChange} />
+            </div>
+            <div className="admin-form-group">
+              <label>كود HTML / سكريبت (لشبكات الإعلانات)</label>
+              <textarea name="htmlCode" className="admin-input" style={{ minHeight: '100px', resize: 'vertical', direction: 'ltr' }} value={dynamicAdForm.htmlCode} onChange={handleDynamicAdFormChange} placeholder="<script>...</script>" />
+            </div>
+            <div className="admin-form-group">
+              <label>الرابط المستهدف (إذا لم يكن كود HTML)</label>
+              <input type="text" name="targetLink" className="admin-input" style={{ direction: 'ltr' }} value={dynamicAdForm.targetLink} onChange={handleDynamicAdFormChange} placeholder="https://example.com" />
+            </div>
+            <div className="admin-form-group">
+              <label>أماكن الظهور</label>
+              <select name="placement" className="admin-input" value={dynamicAdForm.placement} onChange={handleDynamicAdFormChange}>
+                <option value="Both">الكل (الصفحة الرئيسية + الكوبونات)</option>
+                <option value="Homepage">الصفحة الرئيسية فقط</option>
+                <option value="Coupons Page">صفحة الكوبونات فقط</option>
+              </select>
+            </div>
+            <div className="admin-form-group" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <input type="checkbox" name="isActive" id="dyn-isActive" checked={dynamicAdForm.isActive} onChange={handleDynamicAdFormChange} style={{ width: '20px', height: '20px' }} />
+              <label htmlFor="dyn-isActive" style={{ margin: 0 }}>نشط</label>
+            </div>
+            <div className="ad-action-btns">
+              <button className="btn-primary" style={{ padding: '12px 24px' }} onClick={createDynamicAd}>
+                ➕ إضافة الإعلان
+              </button>
+            </div>
+          </div>
+
+          {/* List */}
+          <div className="ad-preview-section">
+            <div className="ad-preview-label">الإعلانات الديناميكية ({dynamicAds.length})</div>
+            <div className="ads-list" style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+              {dynamicAds.length > 0 ? dynamicAds.map(ad => (
+                <div key={ad.id} style={{ border: '1px solid var(--border-color)', borderRadius: '10px', padding: '15px', backgroundColor: 'var(--sidebar-bg)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
+                    <h4 style={{ margin: 0, color: ad.isActive ? 'var(--text-color)' : 'var(--text-secondary)' }}>
+                      {ad.title || 'إعلان بدون عنوان'} 
+                      <span style={{ fontSize: '0.8rem', padding: '2px 8px', borderRadius: '4px', backgroundColor: 'var(--bg-color)', marginRight: '10px' }}>
+                        {ad.placement}
+                      </span>
+                    </h4>
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                      <button onClick={() => toggleDynamicAdStatus(ad)} style={{ padding: '4px 8px', borderRadius: '6px', border: 'none', cursor: 'pointer', backgroundColor: ad.isActive ? 'var(--text-secondary)' : 'var(--primary-color)', color: '#fff' }}>
+                        {ad.isActive ? 'تعطيل' : 'تفعيل'}
+                      </button>
+                      <button onClick={() => removeDynamicAd(ad.id)} style={{ padding: '4px 8px', borderRadius: '6px', border: 'none', cursor: 'pointer', backgroundColor: 'var(--danger-color)', color: '#fff' }}>
+                        حذف
+                      </button>
+                    </div>
+                  </div>
+                  <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'flex', gap: '15px' }}>
+                     <span>مشاهدات: {ad.views}</span>
+                     <span>نقرات: {ad.clicks}</span>
+                  </div>
+                </div>
+              )) : (
+                <div className="ad-preview-empty">
+                   <span>📝</span>
+                   <p>لا توجد إعلانات ديناميكية</p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

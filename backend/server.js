@@ -400,6 +400,69 @@ app.get('/api/advertisement', async (req, res) => {
   }
 });
 
+// Get active dynamic ads (filtered by placement and dates)
+app.get('/api/dynamic-ads', async (req, res) => {
+  try {
+    const { placement } = req.query;
+    const now = new Date();
+    
+    const whereClause = {
+      isActive: true,
+      OR: [
+        { startDate: null, endDate: null },
+        { startDate: { lte: now }, endDate: null },
+        { startDate: null, endDate: { gte: now } },
+        { startDate: { lte: now }, endDate: { gte: now } }
+      ]
+    };
+    
+    const ads = await prisma.dynamicAd.findMany({
+      where: whereClause,
+      orderBy: { createdAt: 'desc' }
+    });
+    
+    // Filter by placement in memory
+    const filteredAds = placement 
+      ? ads.filter(ad => ad.placement === 'Both' || ad.placement === placement)
+      : ads;
+      
+    res.json(filteredAds);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'حدث خطأ في السيرفر' });
+  }
+});
+
+// Track ad view
+app.post('/api/dynamic-ads/:id/view', async (req, res) => {
+  try {
+    const adId = parseInt(req.params.id);
+    await prisma.dynamicAd.update({
+      where: { id: adId },
+      data: { views: { increment: 1 } }
+    });
+    res.json({ success: true });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'حدث خطأ في السيرفر' });
+  }
+});
+
+// Track ad click
+app.post('/api/dynamic-ads/:id/click', async (req, res) => {
+  try {
+    const adId = parseInt(req.params.id);
+    await prisma.dynamicAd.update({
+      where: { id: adId },
+      data: { clicks: { increment: 1 } }
+    });
+    res.json({ success: true });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'حدث خطأ في السيرفر' });
+  }
+});
+
 // ──────────────────────────────────────────────
 // Admin Auth
 // ──────────────────────────────────────────────
@@ -537,6 +600,76 @@ app.delete('/api/admin/advertisement/:id', authenticateAdmin, async (req, res) =
       if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
       await prisma.advertisement.delete({ where: { id: adId } });
     }
+    res.json({ success: true });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'حدث خطأ أثناء حذف الإعلان' });
+  }
+});
+
+// ──────────────────────────────────────────────
+// Admin Dynamic Ads Management
+// ──────────────────────────────────────────────
+
+app.get('/api/admin/dynamic-ads', authenticateAdmin, async (req, res) => {
+  try {
+    const ads = await prisma.dynamicAd.findMany({
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(ads);
+  } catch (error) {
+    res.status(500).json({ error: 'حدث خطأ في السيرفر' });
+  }
+});
+
+app.post('/api/admin/dynamic-ads', authenticateAdmin, async (req, res) => {
+  try {
+    const { title, htmlCode, targetLink, placement, isActive, startDate, endDate } = req.body;
+    const ad = await prisma.dynamicAd.create({
+      data: {
+        title,
+        htmlCode,
+        targetLink,
+        placement: placement || 'Both',
+        isActive: isActive !== undefined ? isActive : true,
+        startDate: startDate ? new Date(startDate) : null,
+        endDate: endDate ? new Date(endDate) : null,
+      }
+    });
+    res.json({ success: true, ad });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'حدث خطأ أثناء إنشاء الإعلان' });
+  }
+});
+
+app.put('/api/admin/dynamic-ads/:id', authenticateAdmin, async (req, res) => {
+  try {
+    const adId = parseInt(req.params.id);
+    const { title, htmlCode, targetLink, placement, isActive, startDate, endDate } = req.body;
+    const ad = await prisma.dynamicAd.update({
+      where: { id: adId },
+      data: {
+        title,
+        htmlCode,
+        targetLink,
+        placement,
+        isActive,
+        startDate: startDate ? new Date(startDate) : null,
+        endDate: endDate ? new Date(endDate) : null,
+      }
+    });
+    res.json({ success: true, ad });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'حدث خطأ أثناء تحديث الإعلان' });
+  }
+});
+
+app.delete('/api/admin/dynamic-ads/:id', authenticateAdmin, async (req, res) => {
+  try {
+    const adId = parseInt(req.params.id);
+    await prisma.dynamicAd.delete({ where: { id: adId } });
     res.json({ success: true });
   } catch (error) {
     console.error(error);
