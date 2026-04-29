@@ -197,6 +197,43 @@ const Admin = () => {
     }
   };
 
+  const handleEndRound = async () => {
+    if (!window.confirm('هل أنت متأكد من إنهاء الجولة الحالية وبدء جولة جديدة؟ سيتم أرشفة الجولة الحالية في السجل.')) return;
+    try {
+      const res = await fetch(`https://couponsweb-production.up.railway.app/api/admin/draw/end`, { method: 'POST', headers: getHeaders() });
+      const data = await res.json();
+      if (data.error) showToast(data.error, 'error');
+      else {
+        showToast('تم إنهاء الجولة وبدء جولة جديدة بنجاح ✅');
+        fetchData(); // Refresh all data
+      }
+    } catch {
+      showToast('حدث خطأ أثناء إنهاء الجولة', 'error');
+    }
+  };
+
+  const handleResetSystem = async () => {
+    const confirm1 = window.confirm('تحذير خطير: هل أنت متأكد من مسح جميع بيانات الموقع (إعلانات، جولات، مشتركين) وإعادة ضبط المصنع؟');
+    if (!confirm1) return;
+    const confirm2 = window.prompt('تأكيد: اكتب كلمة "مسح" باللغة العربية لتأكيد الحذف النهائي.');
+    if (confirm2 !== 'مسح') {
+      showToast('تم إلغاء عملية المسح', 'error');
+      return;
+    }
+    
+    try {
+      const res = await fetch(`https://couponsweb-production.up.railway.app/api/admin/system/reset`, { method: 'POST', headers: getHeaders() });
+      const data = await res.json();
+      if (data.error) showToast(data.error, 'error');
+      else {
+        showToast('تم مسح جميع البيانات بنجاح ✅');
+        fetchData();
+      }
+    } catch {
+      showToast('حدث خطأ أثناء مسح البيانات', 'error');
+    }
+  };
+
   const handleLogout = () => {
     localStorage.removeItem('adminToken');
     window.location.href = '/login';
@@ -262,9 +299,14 @@ const Admin = () => {
             <input type="checkbox" name="couponSystemEnabled" id="couponSystemEnabled" checked={settings.couponSystemEnabled} onChange={handleSettingChange} style={{ width: '20px', height: '20px' }} />
             <label htmlFor="couponSystemEnabled" style={{ margin: 0 }}>تفعيل نظام الكوبونات</label>
           </div>
-          <button className="btn-primary" style={{ padding: '12px', fontSize: '1.1rem' }} onClick={saveSettings}>
-            💾 حفظ الإعدادات
-          </button>
+          <div style={{ display: 'flex', gap: '15px', marginTop: '15px' }}>
+            <button className="btn-primary" style={{ flex: 1, padding: '12px', fontSize: '1.1rem' }} onClick={saveSettings}>
+              💾 حفظ الإعدادات
+            </button>
+            <button className="btn-primary" style={{ flex: 1, padding: '12px', fontSize: '1.1rem', backgroundColor: 'var(--danger-color)' }} onClick={handleResetSystem}>
+              ⚠️ إعادة ضبط المصنع ومسح البيانات
+            </button>
+          </div>
         </div>
 
         {/* Stats */}
@@ -296,6 +338,9 @@ const Admin = () => {
           <div style={{ marginTop: '20px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
             ملاحظة: النظام يعمل بشكل أوتوماتيكي بنظام الجولات على مدار 24 ساعة ولا يتطلب أي تدخل يدوي لبدء أو إيقاف الجولات.
           </div>
+          <button className="btn-primary" style={{ marginTop: '20px', backgroundColor: '#f8b400', color: '#000', fontWeight: 'bold' }} onClick={handleEndRound}>
+            🛑 إنهاء الجولة الحالية يدوياً وبدء جولة جديدة
+          </button>
         </div>
 
         {/* Participants List */}

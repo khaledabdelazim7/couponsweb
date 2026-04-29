@@ -10,10 +10,20 @@ const DynamicAdItem = ({ ad }) => {
     fetch(`${API_URL}/dynamic-ads/${ad.id}/view`, { method: 'POST' }).catch(() => {});
 
     if (ad.htmlCode && containerRef.current) {
-      // Execute scripts inside the HTML
-      const slotHtml = document.createRange().createContextualFragment(ad.htmlCode);
       containerRef.current.innerHTML = '';
-      containerRef.current.appendChild(slotHtml);
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(ad.htmlCode, 'text/html');
+      
+      Array.from(doc.body.childNodes).forEach(node => {
+        if (node.tagName === 'SCRIPT') {
+          const script = document.createElement('script');
+          Array.from(node.attributes).forEach(attr => script.setAttribute(attr.name, attr.value));
+          script.text = node.textContent;
+          containerRef.current.appendChild(script);
+        } else {
+          containerRef.current.appendChild(node.cloneNode(true));
+        }
+      });
     }
   }, [ad]);
 

@@ -549,6 +549,51 @@ app.get('/api/admin/history', authenticateAdmin, async (req, res) => {
   }
 });
 
+// End current round manually
+app.post('/api/admin/draw/end', authenticateAdmin, async (req, res) => {
+  try {
+    const round = await getActiveRound();
+    if (round) {
+      await prisma.drawRound.update({
+        where: { id: round.id },
+        data: { isActive: false, cycleEndDate: new Date() }
+      });
+      // Create new round
+      const newRound = await prisma.drawRound.create({ data: {} });
+      io.emit('roundReset', { roundId: newRound.id });
+      res.json({ success: true, message: 'تم إنهاء الجولة بنجاح وبدء جولة جديدة' });
+    } else {
+      res.status(400).json({ error: 'لا توجد جولة نشطة' });
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'حدث خطأ أثناء إنهاء الجولة' });
+  }
+});
+
+// Factory Reset (Clear All Data)
+app.post('/api/admin/system/reset', authenticateAdmin, async (req, res) => {
+  try {
+    await prisma.drawEntry.deleteMany({});
+    await prisma.drawRound.deleteMany({});
+    await prisma.dynamicAd.deleteMany({});
+    await prisma.advertisement.deleteMany({});
+    await prisma.coupon.deleteMany({});
+    await prisma.user.deleteMany({});
+    
+    await prisma.setting.deleteMany({});
+    await prisma.setting.create({ data: {} });
+    
+    const newRound = await prisma.drawRound.create({ data: {} });
+    io.emit('roundReset', { roundId: newRound.id });
+    
+    res.json({ success: true, message: 'تم إعادة ضبط المصنع ومسح جميع البيانات بنجاح' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'حدث خطأ أثناء إعادة ضبط المصنع' });
+  }
+});
+
 
 
 // ──────────────────────────────────────────────
